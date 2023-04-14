@@ -1,3 +1,5 @@
 # portable-disk-drive
 
-The code is in the esp8266-arduino examples. I have kept it here to make it consistent with my video.
+This is the SD-Card example for esp-arduino 8266/ESP32/ESP32S2/ESP32C3. It is based on the work that 
+Mohammed Rezwanul Islam has done see his video <a href="https://www.youtube.com/watch?v=zJP3Ie3nE7c&t=5s
+"> video</a>
