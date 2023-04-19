@@ -262,7 +262,7 @@ bool loadFromSdCard(String path){
 
 void handleFileUpload(){
   if(server.uri() != "/edit") return;
-  HTTPUpload& upload = server.upload();
+  HTTPUpload& upload = server.upload();  
   if(upload.status == UPLOAD_FILE_START){
     if(SD.exists((char *)upload.filename.c_str())) SD.remove((char *)upload.filename.c_str());
     uploadFile = SD.open(upload.filename.c_str(), FILE_WRITE);
@@ -517,11 +517,16 @@ void setup(void){
      hasSD = true;
   }
 #else
-  sd_spi = new SPIClass(SPI_MODE1);
+
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+  sd_spi = new SPIClass(FSPI);
+#else
+  sd_spi = new SPIClass(); // HSPI
+#endif
+
   sd_spi->begin(SD_PIN_SCK,SD_PIN_MISO,SD_PIN_MOSI,SD_PIN_CS);
   pinMode(sd_spi->pinSS(), OUTPUT);
-  sd_spi->begin(SD_PIN_CS, 25000000);
-  if (SD.begin(SD_PIN_CS, *sd_spi)){
+  if (SD.begin(SD_PIN_CS, *sd_spi, 40000000)){
      DBG_OUTPUT_PORT.println("SD Card initialized.");
      hasSD = true;
   }
@@ -531,15 +536,7 @@ void setup(void){
   timeClient.setUpdateInterval(1000 * 60 * 60 * 24);  // 24 uur
   timeClient.update();
 
-  if (SD.exists("/Log.txt")){
-    String message = "Reboot from: ";
-#if defined(ESP8266) 
-    File LogFile = SD.open("/Log.txt",FILE_WRITE);
-#else
-    File LogFile = SD.open("/Log.txt",FILE_APPEND);
-#endif
-    message += " ESPDate: " +String( getFormattedDateTime(timeClient.getEpochTime()));
-
+  String message = "Reboot from: ";
 #if defined(ESP8266) 
     message +=  ESP.getChipId();
 #else
@@ -570,9 +567,24 @@ void setup(void){
     message += " FlashChipMode: "+String( ESP.getFlashChipMode());
 
     message += " Build Date: "+ String (__DATE__ " " __TIME__);
-    LogFile.println(message);
-  }
+    Log(message);
+  
+}
 
+void Log(String Str)
+{
+if (SD.exists("/Log.txt")){
+    String message = "";
+#if defined(ESP8266) 
+    File LogFile = SD.open("/Log.txt",FILE_WRITE | O_APPEND);
+#else
+    File LogFile = SD.open("/Log.txt",FILE_APPEND);
+#endif
+    message += String( getFormattedDateTime(timeClient.getEpochTime()))+",";
+    message += Str;
+    LogFile.println(message);
+    LogFile.close();
+  }
 }
 
 void loop(void){
