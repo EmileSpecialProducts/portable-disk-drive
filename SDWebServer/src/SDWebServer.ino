@@ -53,35 +53,38 @@
 #define DBG_OUTPUT_PORT Serial
 #if defined(ESP8266)
 #warning "ESP8266 Pins You can not change them"
-//WeMos D1 Mini pinout
-//Label GPIO    Input        Output Notes
-//RTS   RESET 
-//A0    ADC0    Analog Input X
-//D0    GPIO16  no interrupt no     PWM or I2C support HIGH at boot used to wake up from deep sleep
-//D5    GPIO14  OK           OK     SPI (SCLK)
-//D6    GPIO12  OK           OK     SPI (MISO)
-//D7    GPIO13  OK           OK     SPI (MOSI)
-//D8    GPIO15  pulled toGND OK     SPI (CS) Boot fails if pulled HIGH
-//3V3 
 
-//TX    GPIO1   TX pin       OK     HIGH at boot debug output at boot, boot fails if pulled LOW
-//RX    GPIO3   OK           RX pin HIGH at boot
-//D1    GPIO5   OK           OK     often used as SCL (I2C)
-//D2    GPIO4   OK           OK     often used as SDA (I2C)
-//D3    GPIO0   pulled up    OK     connected to FLASH button, boot fails if pulled LOW
-//D4    GPIO2   pulled up    OK     HIGH at boot connected to on-board LED, boot fails if pulled LOW
-//GND
-//5V
+/*
+WeMos D1 Mini pinout
+Label GPIO    Input        Output Notes
+RTS   RESET 
+A0    ADC0    Analog Input X
+D0    GPIO16  no interrupt no     PWM or I2C support HIGH at boot used to wake up from deep sleep
+D5    GPIO14  OK           OK     SPI (SCLK)
+D6    GPIO12  OK           OK     SPI (MISO)
+D7    GPIO13  OK           OK     SPI (MOSI)
+D8    GPIO15  pulled toGND OK     SPI (CS) Boot fails if pulled HIGH
+3V3 
 
-#define SD_PIN_SCK         14 //D5 GPIO14 WeMos D1 Mini 
-#define SD_PIN_MOSI        13 //D7 GPIO13 WeMos D1 Mini 
-#define SD_PIN_MISO        12 //D6 GPIO12 WeMos D1 Mini 
-#define SD_PIN_CS          15 //D8 GPIO15 WeMos D1 Mini 
-#define BOOTPIN            16 //D0 GPIO16 WeMos D1 Mini
+TX    GPIO1   TX pin       OK     HIGH at boot debug output at boot, boot fails if pulled LOW
+RX    GPIO3   OK           RX pin HIGH at boot
+D1    GPIO5   OK           OK     often used as SCL (I2C)
+D2    GPIO4   OK           OK     often used as SDA (I2C)
+D3    GPIO0   pulled up    OK     connected to FLASH button, boot fails if pulled LOW
+D4    GPIO2   pulled up    OK     HIGH at boot connected to on-board LED, boot fails if pulled LOW
+GND
+5V
+*/
 
-#define LED_RED_PIN        2  //D4 GPIO2 WeMos D1 Mini on-board LED
-#define LED_ORANGE_PIN     5  //D1 GPIO5 WeMos D1 Mini 
-#define LED_GREEN_PIN      4  //D2 GPIO4 WeMos D1 Mini 
+#define SD_PIN_SCK         14 // D5 GPIO14 WeMos D1 Mini 
+#define SD_PIN_MOSI        13 // D7 GPIO13 WeMos D1 Mini 
+#define SD_PIN_MISO        12 // D6 GPIO12 WeMos D1 Mini 
+#define SD_PIN_CS          15 // D8 GPIO15 WeMos D1 Mini 
+#define BOOTPIN            16 // D0 GPIO16 WeMos D1 Mini
+
+#define LED_RED_PIN        2  // D4 GPIO2 WeMos D1 Mini on-board LED
+#define LED_ORANGE_PIN     5  // D1 GPIO5 WeMos D1 Mini 
+#define LED_GREEN_PIN      4  // D2 GPIO4 WeMos D1 Mini 
 
 #define RXD               3
 #define TXD               1
@@ -106,6 +109,39 @@ https://github.com/Xinyuan-LilyGO/ESP32_S2
 
 #define RXD               40
 #define TXD               39
+
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#warning "TARGET_ESP32S3"
+// https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/hw-reference/esp32s3/user-guide-devkitm-1.html
+// https://learn.adafruit.com/adafruit-metro-esp32-s3/pinouts
+// gpio.0 Boot Mode. Weak pullup during reset. (Boot Mode 0=Boot from Flash, 1=Download)
+// gpio.3 JTAG Mode. Weak pull down during reset. (JTAG Config)
+// gpio.45 SPI voltage. Weak pull down during reset. (SPI Voltage 0=3.3v 1=1.8v)
+// gpio.46 Boot mode. Weak pull down during reset. (Enabling/Disabling ROM Messages Print During Booting)
+
+// ESP32-S3 DEV Board / Lolin S3 https://www.wemos.cc/en/latest/s3/s3_pro.html / Lilygo T Display S3 :
+// SS=10; MOSI=11; MISO=13; SCK=12
+// Adafruit Feather S3 / QTPY S3 :
+// SS=42; MOSI=35; MISO=37; SCK=36
+// XIAO_ESP32S3 :
+// SS=44; MOSI=9; MISO=8; SCK=7
+// DFRobot Firebeetle S3:
+// SS=10; MOSI=15; MISO=16; SCK=17
+
+// The SPI2 (FSPI) default pins are
+#define SD_PIN_SCK 12
+#define SD_PIN_MOSI 11
+#define SD_PIN_MISO 13
+#define SD_PIN_CS 10
+#define BOOTPIN 0
+
+#define LED_RED_PIN 4
+#define LED_ORANGE_PIN 5
+#define LED_GREEN_PIN 6
+#define LED_RGB_PIN 48 // GPIO 38  
+
+#define RXD 44
+#define TXD 43
 
 #elif defined(CONFIG_IDF_TARGET_ESP32C3)
 
@@ -392,7 +428,7 @@ void handleNotFound(){
 void setup(void){
   pinMode(BOOTPIN, INPUT_PULLUP);
   pinMode(LED_RED_PIN, OUTPUT);
-#if defined(ESP8266) 
+#if defined(ESP8266) || defined(CONFIG_IDF_TARGET_ESP32S2)
   DBG_OUTPUT_PORT.begin(115200);
 #else
   DBG_OUTPUT_PORT.begin(115200,  SERIAL_8N1, RXD, TXD);
@@ -452,7 +488,8 @@ void setup(void){
     DBG_OUTPUT_PORT.println("MDNS responder started");
     DBG_OUTPUT_PORT.print("You can now connect to http://");
     DBG_OUTPUT_PORT.print(host);
-    DBG_OUTPUT_PORT.println(".local");
+    DBG_OUTPUT_PORT.print(".local or http://");
+    DBG_OUTPUT_PORT.println(WiFi.localIP());
   }
 
   // Port defaults to 3232
@@ -518,18 +555,20 @@ void setup(void){
   }
 #else
 
-#if defined(CONFIG_IDF_TARGET_ESP32C3)
+#if defined(CONFIG_IDF_TARGET_ESP32C3) 
   sd_spi = new SPIClass(FSPI);
 #else
   sd_spi = new SPIClass(); // HSPI
 #endif
 
   sd_spi->begin(SD_PIN_SCK,SD_PIN_MISO,SD_PIN_MOSI,SD_PIN_CS);
-  pinMode(sd_spi->pinSS(), OUTPUT);
+  //pinMode(sd_spi->pinSS(), OUTPUT);
   if (SD.begin(SD_PIN_CS, *sd_spi, 40000000)){
      DBG_OUTPUT_PORT.println("SD Card initialized.");
      hasSD = true;
   }
+  else
+    DBG_OUTPUT_PORT.println("SD Card initialized failed.");
 #endif
 
   timeClient.begin();
