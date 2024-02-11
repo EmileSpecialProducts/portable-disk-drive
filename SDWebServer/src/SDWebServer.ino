@@ -227,7 +227,18 @@ const char* ssid = "SSID_ROUTER";
 const char* password = "Password_Router";
 #endif
 
-const char* host = "ESP-NAS";
+#if defined(ESP8266)
+const char *host = "ESP-NAS-12E";
+#elif defined(CONFIG_IDF_TARGET_ESP32)
+const char *host = "ESP-NAS-ESP";
+#elif defined(CONFIG_IDF_TARGET_ESP32C3)
+const char *host = "ESP-NAS-C3";
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+const char *host = "ESP-NAS-S2";
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+const char *host = "ESP-NAS-S3";
+#endif
+
 
 #if defined(ESP8266) 
 ESP8266WebServer server(80);
@@ -260,24 +271,39 @@ void returnFail(String msg) {
   server.send(500, "text/plain", msg + "\r\n");
 }
 
-bool loadFromSdCard(String path){
-  String dataType = "text/plain";
-  if(path.endsWith("/")) path += "index.htm";
 
-  if(path.endsWith(".src")) path = path.substring(0, path.lastIndexOf("."));
-  else if(path.endsWith(".htm")) dataType = "text/html";
-  else if(path.endsWith(".css")) dataType = "text/css";
-  else if(path.endsWith(".js")) dataType = "application/javascript";
-  else if(path.endsWith(".png")) dataType = "image/png";
-  else if(path.endsWith(".gif")) dataType = "image/gif";
-  else if(path.endsWith(".jpg")) dataType = "image/jpeg";
-  else if(path.endsWith(".ico")) dataType = "image/x-icon";
-  else if(path.endsWith(".xml")) dataType = "text/xml";
-  else if(path.endsWith(".pdf")) dataType = "application/pdf";
-  else if(path.endsWith(".zip")) dataType = "application/zip";
+bool loadFromSdCard(String path)
+{
+  String dataType = "text/plain";
+  if (path.endsWith("/"))
+    path += "index.htm";
+
+  if (path.endsWith(".src"))
+    path = path.substring(0, path.lastIndexOf("."));
+  else if (path.endsWith(".htm"))
+    dataType = "text/html";
+  else if (path.endsWith(".css"))
+    dataType = "text/css";
+  else if (path.endsWith(".js"))
+    dataType = "application/javascript";
+  else if (path.endsWith(".png"))
+    dataType = "image/png";
+  else if (path.endsWith(".gif"))
+    dataType = "image/gif";
+  else if (path.endsWith(".jpg"))
+    dataType = "image/jpeg";
+  else if (path.endsWith(".ico"))
+    dataType = "image/x-icon";
+  else if (path.endsWith(".xml"))
+    dataType = "text/xml";
+  else if (path.endsWith(".pdf"))
+    dataType = "application/pdf";
+  else if (path.endsWith(".zip"))
+    dataType = "application/zip";
 
   File dataFile = SD.open(path.c_str());
-  if(dataFile.isDirectory()){
+  if (dataFile.isDirectory())
+  {
     path += "/index.htm";
     dataType = "text/html";
     dataFile = SD.open(path.c_str());
@@ -286,15 +312,40 @@ bool loadFromSdCard(String path){
   if (!dataFile)
     return false;
 
-  if (server.hasArg("download")) dataType = "application/octet-stream";
-
-  if (server.streamFile(dataFile, dataType) != dataFile.size()) {
-    DBG_OUTPUT_PORT.println("Sent less data than expected!");
+  uint64_t filesize = dataFile.size();
+  if (server.hasArg("download"))
+    dataType = "application/octet-stream";
+  if (path.endsWith("gz") &&
+      dataType != "application/x-gzip" &&
+      dataType != "application/octet-stream")
+  {
+    server.sendHeader(F("Content-Encoding"), F("gzip"));
   }
+  // server.sendHeader("Connection","keep-alive",true);
+  // server.sendHeader("Keep-Alive", "timeout=2000");
+  // server.setContentLength(CONTENT_LENGTH_UNKNOWN); 
+  server.setContentLength(filesize);
+  server.send(200, dataType, "");
 
+  size_t blocksize = 0;
+  char databuffer[1024];
+  while (filesize > 0)
+  {
+    blocksize = dataFile.readBytes(databuffer, sizeof(databuffer));
+    if (blocksize > 0)
+      server.sendContent(databuffer, blocksize);
+    else
+      filesize = 0;
+    if (filesize > blocksize)
+      filesize -= blocksize;
+    else
+      filesize = 0;
+  }
+  server.client().flush();
   dataFile.close();
   return true;
 }
+
 
 void handleFileUpload(){
   if(server.uri() != "/edit") return;
@@ -405,12 +456,17 @@ void printDirectory() {
     entry.close();
  }
  server.sendContent("]");
+ server.client().flush();
  dir.close();
 }
 
 void handleNotFound(){
   if(hasSD && loadFromSdCard(server.uri())) return;
   String message = "SDCARD Not Detected\n\n";
+  message += "SD_PIN_MISO = " + String(SD_PIN_MISO) + "\n";
+  message += "SD_PIN_MOSI = " + String(SD_PIN_MOSI) + "\n";
+  message += "SD_PIN_SCK = " + String(SD_PIN_SCK) + "\n";
+  message += "SD_PIN_CS = " + String(SD_PIN_CS) + "\n";
   message += "URI: ";
   message += server.uri();
   message += "\nMethod: ";
@@ -422,13 +478,15 @@ void handleNotFound(){
     message += " NAME:"+server.argName(i) + "\n VALUE:" + server.arg(i) + "\n";
   }
   server.send(404, "text/plain", message);
+  server.client().flush();
   DBG_OUTPUT_PORT.print(message);
 }
 
 void setup(void){
   pinMode(BOOTPIN, INPUT_PULLUP);
   pinMode(LED_RED_PIN, OUTPUT);
-#if defined(ESP8266) || defined(CONFIG_IDF_TARGET_ESP32S2)
+  
+#if defined(ESP8266) || defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32)
   DBG_OUTPUT_PORT.begin(115200);
 #else
   DBG_OUTPUT_PORT.begin(115200,  SERIAL_8N1, RXD, TXD);
@@ -477,19 +535,24 @@ void setup(void){
     DBG_OUTPUT_PORT.println(ssid);
     while(1) delay(500);
   }
-#endif  
-  DBG_OUTPUT_PORT.print("Connected! IP address: ");
-  DBG_OUTPUT_PORT.println(WiFi.localIP());
-  DBG_OUTPUT_PORT.print("Connecting to ");
-  DBG_OUTPUT_PORT.println(WiFi.SSID());
+#endif
 
-  if (MDNS.begin(host)) {
-    MDNS.addService("http", "tcp", 80);
-    DBG_OUTPUT_PORT.println("MDNS responder started");
-    DBG_OUTPUT_PORT.print("You can now connect to http://");
-    DBG_OUTPUT_PORT.print(host);
-    DBG_OUTPUT_PORT.print(".local or http://");
+#if not defined(ESP8266)
+    esp_wifi_set_ps(WIFI_PS_NONE); // Esp32 enters the power saving mode by default,
+#endif
+    DBG_OUTPUT_PORT.print("Connected! IP address: ");
     DBG_OUTPUT_PORT.println(WiFi.localIP());
+    DBG_OUTPUT_PORT.print("Connecting to ");
+    DBG_OUTPUT_PORT.println(WiFi.SSID());
+
+    if (MDNS.begin(host))
+    {
+      MDNS.addService("http", "tcp", 80);
+      DBG_OUTPUT_PORT.println("MDNS responder started");
+      DBG_OUTPUT_PORT.print("You can now connect to http://");
+      DBG_OUTPUT_PORT.print(host);
+      DBG_OUTPUT_PORT.print(".local or http://");
+      DBG_OUTPUT_PORT.println(WiFi.localIP());
   }
 
   // Port defaults to 3232
