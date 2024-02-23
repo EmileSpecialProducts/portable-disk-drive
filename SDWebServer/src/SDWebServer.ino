@@ -49,8 +49,9 @@
 #include <SD.h>
 #include "NTP.hpp"
 
-
 #define DBG_OUTPUT_PORT Serial
+ // USBSerial Serial Serial1 Serial2
+
 #if defined(ESP8266)
 #warning "ESP8266 Pins You can not change them"
 
@@ -158,7 +159,23 @@ https://github.com/Xinyuan-LilyGO/ESP32_S2
 #define RXD               20
 #define TXD               21
 
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+// https://github.com/wuxx/nanoESP32-C6
 
+#define SD_PIN_SCK    21
+#define SD_PIN_MOSI   19
+#define SD_PIN_MISO   20
+#define SD_PIN_CS     18
+
+#define PIN_NEOPIXEL  8
+#define BOOTPIN       9
+
+#define LED_RED_PIN    4
+#define LED_ORANGE_PIN 5
+#define LED_GREEN_PIN  6
+
+#define RXD 17
+#define TXD 16
 #elif defined(CONFIG_IDF_TARGET_ESP32)
 /****************************************************************************
     pin setup
@@ -227,18 +244,19 @@ const char* ssid = "SSID_ROUTER";
 const char* password = "Password_Router";
 #endif
 
-#if defined(ESP8266)
-const char *host = "ESP-NAS-12E";
+#if defined(ESP8266) 
+const char* host = "ESP-NAS-12E";
 #elif defined(CONFIG_IDF_TARGET_ESP32)
-const char *host = "ESP-NAS-ESP";
+const char* host = "ESP-NAS-ESP";
 #elif defined(CONFIG_IDF_TARGET_ESP32C3)
-const char *host = "ESP-NAS-C3";
+const char* host = "ESP-NAS-C3";
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+const char* host = "ESP-NAS-C6";
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
-const char *host = "ESP-NAS-S2";
+const char* host = "ESP-NAS-S2";
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
-const char *host = "ESP-NAS-S3";
+const char* host = "ESP-NAS-S3";
 #endif
-
 
 #if defined(ESP8266) 
 ESP8266WebServer server(80);
@@ -260,6 +278,8 @@ unsigned long PreviousTimeDay;
 uint16_t Config_Reset_Counter=0;
 int OTAUploadBusy=0;
 static bool hasSD = false;
+int SDmaxSpeed = 0;
+
 File uploadFile;
 
 
@@ -331,11 +351,10 @@ bool loadFromSdCard(String path)
   char databuffer[1024];
   while (filesize > 0)
   {
-    blocksize = dataFile.readBytes(databuffer, sizeof(databuffer));
-    if (blocksize > 0)
-      server.sendContent(databuffer, blocksize);
-    else
-      filesize = 0;
+    blocksize = dataFile.read((uint8_t*)databuffer, sizeof(databuffer));
+    if (blocksize > 0) server.sendContent(databuffer, blocksize);
+        else
+        filesize = 0;  
     if (filesize > blocksize)
       filesize -= blocksize;
     else
@@ -500,6 +519,7 @@ void handleNotFound()
   message += "SD_PIN_MOSI = " + String(SD_PIN_MOSI) + "\n";
   message += "SD_PIN_SCK = " + String(SD_PIN_SCK) + "\n";
   message += "SD_PIN_CS = " + String(SD_PIN_CS) + "\n";
+  message += "CardSpeed = " + String(SDmaxSpeed)+ "\n";
   message += "URI: ";
   message += server.uri();
   message += "\nMethod: ";
@@ -569,7 +589,7 @@ void setup(void){
     while(1) delay(500);
   }
 #endif
-
+    WiFi.setSleep(false);
 #if not defined(ESP8266)
     esp_wifi_set_ps(WIFI_PS_NONE); // Esp32 enters the power saving mode by default,
 #endif
@@ -592,7 +612,7 @@ void setup(void){
   // ArduinoOTA.setPort(3232);
 
   // Hostname defaults to esp3232-[MAC]
-  // ArduinoOTA.setHostname("myesp32");
+  ArduinoOTA.setHostname(host);
 
   // No authentication by default
   // ArduinoOTA.setPassword("admin");
@@ -645,26 +665,37 @@ void setup(void){
   DBG_OUTPUT_PORT.println("HTTP server started");
 
 #if defined(ESP8266) || defined(CONFIG_IDF_TARGET_ESP32)
+  SDmaxSpeed =0;
   if (SD.begin(SD_PIN_CS)){
      DBG_OUTPUT_PORT.println("SD Card initialized.");
      hasSD = true;
   }
 #else
 
-#if defined(CONFIG_IDF_TARGET_ESP32C3) 
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
   sd_spi = new SPIClass(FSPI);
 #else
   sd_spi = new SPIClass(); // HSPI
 #endif
-
+SDmaxSpeed =50;
   sd_spi->begin(SD_PIN_SCK,SD_PIN_MISO,SD_PIN_MOSI,SD_PIN_CS);
-  //pinMode(sd_spi->pinSS(), OUTPUT);
-  if (SD.begin(SD_PIN_CS, *sd_spi, 40000000)){
+  while (SDmaxSpeed>4 && hasSD==false)
+  {
+    if (SD.begin(SD_PIN_CS, *sd_spi, 1000000UL * SDmaxSpeed)){
+     DBG_OUTPUT_PORT.println("SD Card initialized.");
+     hasSD = true;
+    } else SDmaxSpeed-=4;
+  }
+  if(hasSD == false) DBG_OUTPUT_PORT.println("SD Card initialized failed.");
+/*
+  sd_spi->begin(SD_PIN_SCK,SD_PIN_MISO,SD_PIN_MOSI,SD_PIN_CS);
+  if (SD.begin(SD_PIN_CS, *sd_spi, 4000000)){
      DBG_OUTPUT_PORT.println("SD Card initialized.");
      hasSD = true;
   }
   else
     DBG_OUTPUT_PORT.println("SD Card initialized failed.");
+*/
 #endif
 
   timeClient.begin();
@@ -700,7 +731,7 @@ void setup(void){
     message += " FlashChipSize: "+String( ESP.getFlashChipSize());
     message += " FlashChipSpeed: "+String( ESP.getFlashChipSpeed());
     message += " FlashChipMode: "+String( ESP.getFlashChipMode());
-
+    message += " CardSpeed: " + String(SDmaxSpeed);
     message += " Build Date: "+ String (__DATE__ " " __TIME__);
     Log(message);
   
