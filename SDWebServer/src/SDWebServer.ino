@@ -374,13 +374,13 @@ void handleFileUpload(){
   if(upload.status == UPLOAD_FILE_START){
     if(SD.exists((char *)upload.filename.c_str())) SD.remove((char *)upload.filename.c_str());
     uploadFile = SD.open(upload.filename.c_str(), FILE_WRITE);
-    DBG_OUTPUT_PORT.print("Upload: START, filename: "); DBG_OUTPUT_PORT.println(upload.filename);
+    //DBG_OUTPUT_PORT.print("Upload: START, filename: "); DBG_OUTPUT_PORT.println(upload.filename);
   } else if(upload.status == UPLOAD_FILE_WRITE){
     if(uploadFile) uploadFile.write(upload.buf, upload.currentSize);
-    DBG_OUTPUT_PORT.print("Upload: WRITE, Bytes: "); DBG_OUTPUT_PORT.println(upload.currentSize);
+    //DBG_OUTPUT_PORT.print("Upload: WRITE, Bytes: "); DBG_OUTPUT_PORT.println(upload.currentSize);
   } else if(upload.status == UPLOAD_FILE_END){
     if(uploadFile) uploadFile.close();
-    DBG_OUTPUT_PORT.print("Upload: END, Size: "); DBG_OUTPUT_PORT.println(upload.totalSize);
+    //DBG_OUTPUT_PORT.print("Upload: END, Size: "); DBG_OUTPUT_PORT.println(upload.totalSize);
   }
 }
 
@@ -516,12 +516,15 @@ void handleNotFound()
 {
   if (hasSD && loadFromSdCard(urlDecode(server.uri())))
     return;
-  String message = "SDCARD Not Detected\n\n";
-  message += "SD_PIN_MISO = " + String(SD_PIN_MISO) + "\n";
-  message += "SD_PIN_MOSI = " + String(SD_PIN_MOSI) + "\n";
-  message += "SD_PIN_SCK = " + String(SD_PIN_SCK) + "\n";
-  message += "SD_PIN_CS = " + String(SD_PIN_CS) + "\n";
-  message += "CardSpeed = " + String(SDmaxSpeed)+ "\n";
+  String message=""; 
+  if(hasSD == false){
+    message+= "SDCARD Not Detected\n\n";
+    message += "SD_PIN_MISO = " + String(SD_PIN_MISO) + "\n";
+    message += "SD_PIN_MOSI = " + String(SD_PIN_MOSI) + "\n";
+    message += "SD_PIN_SCK = " + String(SD_PIN_SCK) + "\n";
+    message += "SD_PIN_CS = " + String(SD_PIN_CS) + "\n";
+    message += "CardSpeed = " + String(SDmaxSpeed)+ "\n";
+  }
   message += "URI: ";
   message += server.uri();
   message += "\nMethod: ";
@@ -569,7 +572,7 @@ void setup(void){
         DBG_OUTPUT_PORT.println("Failed to connect Restarting");
         delay(5000);
          if (digitalRead(BOOTPIN)==LOW){ 
-          //wm.resetSettings();
+          wm.resetSettings();
         }
         ESP.restart();
     }
