@@ -543,8 +543,8 @@ void handleNotFound()
 void setup(void){
   pinMode(BOOTPIN, INPUT_PULLUP);
   pinMode(LED_RED_PIN, OUTPUT);
-  
-#if defined(ESP8266) || defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32)
+
+#if defined(ESP8266) || defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32) || DBG_OUTPUT_PORT == USBSerial 
   DBG_OUTPUT_PORT.begin(115200);
 #else
   DBG_OUTPUT_PORT.begin(115200,  SERIAL_8N1, RXD, TXD);
