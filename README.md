@@ -1,3 +1,8 @@
+<p align="center">
+  <a href="https://buymeacoffee.com/emilespecialproducts">
+    <img alt="BuymeaCoffee" src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png">
+  </a>
+</p>
 # portable-disk-drive
 
 Not recomended for new designs but use the FatEx version <a href="https://github.com/EmileSpecialProducts/portable-disk-driveEx">portable-disk-driveEx</a>
